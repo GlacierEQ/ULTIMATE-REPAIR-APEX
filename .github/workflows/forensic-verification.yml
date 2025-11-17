@@ -1,0 +1,44 @@
+name: Forensic Verification
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  verify-integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check repository integrity
+        run: |
+          git fsck --full --strict
+          echo "✅ Repository integrity verified"
+
+      - name: Verify SHA-256 checksums
+        run: |
+          if [[ -f checksums.txt ]]; then
+            sha256sum -c checksums.txt || exit 1
+            echo "✅ Checksums verified"
+          else
+            echo "::warning::checksums.txt not found"
+          fi
+
+      - name: Generate verification report
+        run: |
+          chmod +x verify-repo.sh
+          ./verify-repo.sh > verification-report-${{ github.sha }}.txt
+
+      - name: Upload verification artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: verification-report-${{ github.sha }}
+          path: verification-report-*.txt
+          retention-days: 90
